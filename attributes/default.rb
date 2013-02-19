@@ -24,6 +24,17 @@ default["horizon"]["custom_template_banner"] = "
 # Do not edit, changes will be overwritten
 "
 
+# valid options: package, or git
+default["horizon"]["install_method"] = "package"
+default["horizon"]["release"] = node["openstack"]["release"]
+
+# if install_method is git, the following attributes are used.
+default["horizon"]["git_repo"] = "https://github.com/openstack/horizon.git"
+default["horizon"]["git_revision"] = "master"
+default["horizon"]["git_dest_dir"] = "/opt/stack"
+
+
+
 default["horizon"]["debug"] = false
 
 # This user's password is stored in an encrypted databag
@@ -61,11 +72,26 @@ when "ubuntu", "debian"
     "horizon_packages" => ["lessc","openstack-dashboard", "python-mysqldb"],
     "package_overrides" => "-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'"
   }
+  # dependencies when installed from source (git)
+  default["horizon"]["source_platform"] = {
+    "horizon_packages" => ["python-pip", "python-dev", "build-essential", "lessc", "python-mysqldb"],
+    "package_overrides" => "-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'"
+  }
 end
 
-default["horizon"]["dash_path"] = "/usr/share/openstack-dashboard/openstack_dashboard"
-default["horizon"]["stylesheet_path"] = "/usr/share/openstack-dashboard/openstack_dashboard/templates/_stylesheets.html"
+default["horizon"]["dash_root_path"] = "/usr/share/openstack-dashboard"
+if node["horizon"]["install_method"] == "git" then
+  default["horizon"]["local_settings_path"] = "#{node["horizon"]["git_dest_dir"]}/horizon/openstack_dashboard/local/local_settings.py"
+default["horizon"]["dash_root_path"] = "/#{node["horizon"]["git_dest_dir"]}/horizon"
+end
+
+default["horizon"]["dash_path"] = node["horizon"]["dash_root_path"] + "/openstack_dashboard"
+
+default["horizon"]["stylesheet_path"] = node["horizon"]["dash_path"] + "/templates/_stylesheets.html"
 default["horizon"]["wsgi_path"] = node["horizon"]["dash_path"] + "/wsgi/django.wsgi"
-default["horizon"]["session_backend"] = "memcached"
+#default["horizon"]["session_backend"] = "memcached"
+default["horizon"]["session_backend"] = "file"
 
 default["horizon"]["ssl_offload"] = "false"
+
+

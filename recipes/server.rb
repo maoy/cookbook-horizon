@@ -37,6 +37,9 @@ execute "set-selinux-permissive" do
 end
 
 platform_options = node["horizon"]["platform"]
+if node["horizon"]["install_method"] == "git" then
+  platform_options = node["horizon"]["source_platform"]
+end
 
 include_recipe "apache2"
 include_recipe "apache2::mod_wsgi"
@@ -71,7 +74,51 @@ platform_options["horizon_packages"].each do |pkg|
   end
 end
 
-memcached = memcached_servers
+if node["horizon"]["install_method"] == "git" then
+
+  include_recipe "git"
+
+  # make sure this is installed from source
+  package "python-pyparsing" do
+    action :purge
+  end
+
+  bash "install_horizon_from_source" do
+    user "root"
+    cwd "#{node["horizon"]["git_dest_dir"]}/horizon"
+    #Note(maoy): we install glanceclient first to get prettytable<0.7.
+    #Otherwise prettytable is installed with a higher version which prevents the installation from continuing.
+    #glanceclient itself is specified as a dependency by itself so there is no need to install it if weren't
+    #for this dumb reason.
+    code <<-EOH
+    pip install python-glanceclient
+    python setup.py develop
+    mkdir -p static
+    chown -R www-data:www-data static/
+    EOH
+    action :nothing
+  end
+
+  directory "#{node["horizon"]["git_dest_dir"]}" do
+    owner "root"
+    group "root"
+    mode 00755
+    recursive true
+    action :create
+  end
+
+  git "#{node["horizon"]["git_dest_dir"]}/horizon" do
+    repo "#{node["horizon"]["git_repo"]}"
+    revision "#{node["horizon"]["git_revision"]}"
+    action :sync
+    notifies :run, resources(:bash => "install_horizon_from_source"), :immediately
+  end
+
+  node["horizon"]["git_hash"] = `bash -c "cd #{node["horizon"]["git_dest_dir"]}/horizon; git rev-parse HEAD"`
+end
+
+#memcached = memcached_servers
+memcached = [] #FIXME
 
 template node["horizon"]["local_settings_path"] do
   source "local_settings.py.erb"
@@ -90,8 +137,8 @@ end
 
 # FIXME: this shouldn't run every chef run
 execute "openstack-dashboard syncdb" do
-  cwd "/usr/share/openstack-dashboard"
-  environment ({'PYTHONPATH' => '/etc/openstack-dashboard:/usr/share/openstack-dashboard:$PYTHONPATH'})
+  cwd "#{node["horizon"]["dash_root_path"]}"
+  environment ({'PYTHONPATH' => '/etc/openstack-dashboard:#{node["horizon"]["dash_root_path"]}:$PYTHONPATH'})
   command "python manage.py syncdb --noinput"
   action :run
   # not_if "/usr/bin/mysql -u root -e 'describe #{node["dash"]["db"]}.django_content_type'"

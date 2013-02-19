@@ -1,4 +1,7 @@
 <%= node["horizon"]["custom_template_banner"] %>
+<% if node["horizon"]["install_method"] == "git" -%>
+# installed from git version <%= node["horizon"]["git_hash"] %>
+<% end %>
 
 import os
 
@@ -31,10 +34,17 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 #     },
 #    'help_url': "http://docs.openstack.org"
 # }
+<% if node["horizon"]["release"] >= "grizzly" -%>
+HORIZON_CONFIG = {
+        'dashboards': ('project', 'admin', 'settings',),
+            'default_dashboard': 'project',
+}
+<% else -%>
 HORIZON_CONFIG = {
     'dashboards': ('nova', 'syspanel', 'settings',),
     'default_dashboard': 'nova',
 }
+<% end %>
 
 LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -199,7 +209,10 @@ SWIFT_PAGINATE_LIMIT = 100
 #QUANTUM_TENANT = '1234'
 #QUANTUM_CLIENT_VERSION='0.1'
 
+<% if node["horizon"]["install_method"] != "git" -%>
 COMPRESS_OFFLINE = True
+<% end %>
+
 # If you have external monitoring links
 # EXTERNAL_MONITORING = [
 #     ['Nagios','http://foo.com'],
