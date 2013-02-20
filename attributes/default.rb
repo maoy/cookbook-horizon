@@ -17,6 +17,7 @@
 # limitations under the License.
 #
 
+include_attribute "openstack-common"
 # Set to some text value if you want templated config files
 # to contain a custom banner at the top of the written file
 default["horizon"]["custom_template_banner"] = "
